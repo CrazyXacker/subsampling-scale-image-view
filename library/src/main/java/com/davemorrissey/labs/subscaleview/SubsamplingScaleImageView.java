@@ -131,6 +131,11 @@ public class SubsamplingScaleImageView extends View {
     /** State change originated from a double tap zoom anim. */
     public static final int ORIGIN_DOUBLE_TAP_ZOOM = 4;
 
+    private static float FLING_VELOCITY_FACTOR_X = 0.25f;
+    private static float FLING_VELOCITY_FACTOR_Y = 0.25f;
+
+    private static long FLING_ANIM_DURATION = 500;
+
     // Bitmap (preview or full image)
     private Bitmap bitmap;
 
@@ -551,10 +556,10 @@ public class SubsamplingScaleImageView extends View {
             @Override
             public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
                 if (panEnabled && readySent && vTranslate != null && e1 != null && e2 != null && (Math.abs(e1.getX() - e2.getX()) > 50 || Math.abs(e1.getY() - e2.getY()) > 50) && (Math.abs(velocityX) > 500 || Math.abs(velocityY) > 500) && !isZooming) {
-                    PointF vTranslateEnd = new PointF(vTranslate.x + (velocityX * 0.25f), vTranslate.y + (velocityY * 0.25f));
+                    PointF vTranslateEnd = new PointF(vTranslate.x + (velocityX * FLING_VELOCITY_FACTOR_X), vTranslate.y + (velocityY * FLING_VELOCITY_FACTOR_Y));
                     float sCenterXEnd = ((getWidth()/2) - vTranslateEnd.x)/scale;
                     float sCenterYEnd = ((getHeight()/2) - vTranslateEnd.y)/scale;
-                    new AnimationBuilder(new PointF(sCenterXEnd, sCenterYEnd)).withEasing(EASE_OUT_QUAD).withPanLimited(false).withOrigin(ORIGIN_FLING).start();
+                    new AnimationBuilder(new PointF(sCenterXEnd, sCenterYEnd)).withEasing(EASE_OUT_QUAD).withPanLimited(false).withOrigin(ORIGIN_FLING).withDuration(FLING_ANIM_DURATION).start();
                     return true;
                 }
                 return super.onFling(e1, e2, velocityX, velocityY);
@@ -2455,6 +2460,18 @@ public class SubsamplingScaleImageView extends View {
             fitToBounds(true);
             invalidate();
         }
+    }
+
+    public static void setFlingVelocityFactorX(float flingVelocityFactorX) {
+        FLING_VELOCITY_FACTOR_X = flingVelocityFactorX;
+    }
+
+    public static void setFlingVelocityFactorY(float flingVelocityFactorY) {
+        FLING_VELOCITY_FACTOR_Y = flingVelocityFactorY;
+    }
+
+    public static void setFlingAnimDuration(long flingAnimDuration) {
+        FLING_ANIM_DURATION = flingAnimDuration;
     }
 
     /**
