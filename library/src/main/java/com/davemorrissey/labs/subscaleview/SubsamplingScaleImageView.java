@@ -14,8 +14,6 @@ import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.support.annotation.Nullable;
-import android.support.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
@@ -23,6 +21,8 @@ import android.os.Message;
 import android.provider.MediaStore;
 import android.support.annotation.AnyThread;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.media.ExifInterface;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -32,7 +32,6 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewParent;
 
-import com.davemorrissey.labs.subscaleview.R.styleable;
 import com.davemorrissey.labs.subscaleview.decoder.CompatDecoderFactory;
 import com.davemorrissey.labs.subscaleview.decoder.DecoderFactory;
 import com.davemorrissey.labs.subscaleview.decoder.ImageDecoder;
@@ -191,6 +190,9 @@ public class SubsamplingScaleImageView extends View {
     private boolean zoomEnabled = true;
     private boolean quickScaleEnabled = true;
 
+    // Indicates that multiple SSIV instances placed in vertical scrolling view
+    private boolean isVerticalScrollingMode = false;
+
     // Double tap zoom behaviour
     private float doubleTapZoomScale = 1F;
     private int doubleTapZoomStyle = ZOOM_FOCUS_FIXED;
@@ -308,30 +310,30 @@ public class SubsamplingScaleImageView extends View {
         });
         // Handle XML attributes
         if (attr != null) {
-            TypedArray typedAttr = getContext().obtainStyledAttributes(attr, styleable.SubsamplingScaleImageView);
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_assetName)) {
-                String assetName = typedAttr.getString(styleable.SubsamplingScaleImageView_assetName);
+            TypedArray typedAttr = getContext().obtainStyledAttributes(attr, R.styleable.SubsamplingScaleImageView);
+            if (typedAttr.hasValue(R.styleable.SubsamplingScaleImageView_assetName)) {
+                String assetName = typedAttr.getString(R.styleable.SubsamplingScaleImageView_assetName);
                 if (assetName != null && assetName.length() > 0) {
                     setImage(ImageSource.asset(assetName).tilingEnabled());
                 }
             }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_src)) {
-                int resId = typedAttr.getResourceId(styleable.SubsamplingScaleImageView_src, 0);
+            if (typedAttr.hasValue(R.styleable.SubsamplingScaleImageView_src)) {
+                int resId = typedAttr.getResourceId(R.styleable.SubsamplingScaleImageView_src, 0);
                 if (resId > 0) {
                     setImage(ImageSource.resource(resId).tilingEnabled());
                 }
             }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_panEnabled)) {
-                setPanEnabled(typedAttr.getBoolean(styleable.SubsamplingScaleImageView_panEnabled, true));
+            if (typedAttr.hasValue(R.styleable.SubsamplingScaleImageView_panEnabled)) {
+                setPanEnabled(typedAttr.getBoolean(R.styleable.SubsamplingScaleImageView_panEnabled, true));
             }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_zoomEnabled)) {
-                setZoomEnabled(typedAttr.getBoolean(styleable.SubsamplingScaleImageView_zoomEnabled, true));
+            if (typedAttr.hasValue(R.styleable.SubsamplingScaleImageView_zoomEnabled)) {
+                setZoomEnabled(typedAttr.getBoolean(R.styleable.SubsamplingScaleImageView_zoomEnabled, true));
             }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_quickScaleEnabled)) {
-                setQuickScaleEnabled(typedAttr.getBoolean(styleable.SubsamplingScaleImageView_quickScaleEnabled, true));
+            if (typedAttr.hasValue(R.styleable.SubsamplingScaleImageView_quickScaleEnabled)) {
+                setQuickScaleEnabled(typedAttr.getBoolean(R.styleable.SubsamplingScaleImageView_quickScaleEnabled, true));
             }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_tileBackgroundColor)) {
-                setTileBackgroundColor(typedAttr.getColor(styleable.SubsamplingScaleImageView_tileBackgroundColor, Color.argb(0, 0, 0, 0)));
+            if (typedAttr.hasValue(R.styleable.SubsamplingScaleImageView_tileBackgroundColor)) {
+                setTileBackgroundColor(typedAttr.getColor(R.styleable.SubsamplingScaleImageView_tileBackgroundColor, Color.argb(0, 0, 0, 0)));
             }
             typedAttr.recycle();
         }
@@ -862,8 +864,12 @@ public class SubsamplingScaleImageView extends View {
                             boolean atYEdge = lastY != vTranslate.y;
                             boolean edgeXSwipe = atXEdge && dx > dy && !isPanning;
                             boolean edgeYSwipe = atYEdge && dy > dx && !isPanning;
-                            boolean yPan = lastY == vTranslate.y && dy > offset * 3;
-                            if (!edgeXSwipe && !edgeYSwipe && (!atXEdge || !atYEdge || yPan || isPanning)) {
+                            boolean yPan = (lastY == vTranslate.y && dy > offset * 3) || (!isVerticalScrollingMode && (atYEdge && (lastY > 0 && vTranslate.y == 0 || vTranslate.y - lastY > 0)));
+//                            Log.d(TAG, "onTouchEventInternal: dx = " + dx + "; dy = " + dy + "; offset = " + offset + "; lastY = " + lastY + "; vTranslate.y = " + vTranslate.y);
+//                            Log.d(TAG, "onTouchEventInternal: atXEdge = " + atXEdge + "; atYEdge = "
+//                                    + atYEdge + "; edgeXSwipe = " + edgeXSwipe + "; edgeYSwipe = "
+//                                    + edgeYSwipe + "; yPan = " + yPan);
+                            if ((!edgeXSwipe && !isVerticalScrollingMode || !edgeXSwipe && !edgeYSwipe) && (!atXEdge || !atYEdge || yPan || isPanning)) {
                                 isPanning = true;
                             } else if (dx > offset || dy > offset) {
                                 // Haven't panned the image, and we're at the left or right edge. Switch to page swipe.
@@ -1336,9 +1342,9 @@ public class SubsamplingScaleImageView extends View {
      */
     private boolean tileVisible(Tile tile) {
         float sVisLeft = viewToSourceX(0),
-            sVisRight = viewToSourceX(getWidth()),
-            sVisTop = viewToSourceY(0),
-            sVisBottom = viewToSourceY(getHeight());
+                sVisRight = viewToSourceX(getWidth()),
+                sVisTop = viewToSourceY(0),
+                sVisBottom = viewToSourceY(getHeight());
         return !(sVisLeft > tile.sRect.right || tile.sRect.left > sVisRight || sVisTop > tile.sRect.bottom || tile.sRect.top > sVisBottom);
     }
 
@@ -1514,10 +1520,10 @@ public class SubsamplingScaleImageView extends View {
                     tile.sampleSize = sampleSize;
                     tile.visible = sampleSize == fullImageSampleSize;
                     tile.sRect = new Rect(
-                        x * sTileWidth,
-                        y * sTileHeight,
-                        x == xTiles - 1 ? sWidth() : (x + 1) * sTileWidth,
-                        y == yTiles - 1 ? sHeight() : (y + 1) * sTileHeight
+                            x * sTileWidth,
+                            y * sTileHeight,
+                            x == xTiles - 1 ? sWidth() : (x + 1) * sTileWidth,
+                            y == yTiles - 1 ? sHeight() : (y + 1) * sTileHeight
                     );
                     tile.vRect = new Rect(0, 0, 0, 0);
                     tile.fileSRect = new Rect(tile.sRect);
@@ -2227,10 +2233,10 @@ public class SubsamplingScaleImageView extends View {
      */
     private void sourceToViewRect(@NonNull Rect sRect, @NonNull Rect vTarget) {
         vTarget.set(
-            (int)sourceToViewX(sRect.left),
-            (int)sourceToViewY(sRect.top),
-            (int)sourceToViewX(sRect.right),
-            (int)sourceToViewY(sRect.bottom)
+                (int)sourceToViewX(sRect.left),
+                (int)sourceToViewY(sRect.top),
+                (int)sourceToViewX(sRect.right),
+                (int)sourceToViewY(sRect.bottom)
         );
     }
 
@@ -2734,6 +2740,14 @@ public class SubsamplingScaleImageView extends View {
     }
 
     /**
+     * Indicates that multiple SSIV instances placed in vertical scrolling view.
+     * @param verticalScrollingMode true if multiple SSIV instances placed in vertical scrolling view.
+     */
+    public final void setVerticalScrollingMode(boolean verticalScrollingMode) {
+        this.isVerticalScrollingMode = verticalScrollingMode;
+    }
+
+    /**
      * Returns true if pan gesture detection is enabled.
      * @return true if pan gesture detection is enabled.
      */
@@ -3081,8 +3095,8 @@ public class SubsamplingScaleImageView extends View {
             anim.sCenterEnd = targetSCenter;
             anim.vFocusStart = sourceToViewCoord(targetSCenter);
             anim.vFocusEnd = new PointF(
-                vxCenter,
-                vyCenter
+                    vxCenter,
+                    vyCenter
             );
             anim.duration = duration;
             anim.interruptible = interruptible;
@@ -3100,8 +3114,8 @@ public class SubsamplingScaleImageView extends View {
                 fitToBounds(true, satEnd);
                 // Adjust the position of the focus point at end so image will be in bounds
                 anim.vFocusEnd = new PointF(
-                    vFocus.x + (satEnd.vTranslate.x - vTranslateXEnd),
-                    vFocus.y + (satEnd.vTranslate.y - vTranslateYEnd)
+                        vFocus.x + (satEnd.vTranslate.x - vTranslateXEnd),
+                        vFocus.y + (satEnd.vTranslate.y - vTranslateYEnd)
                 );
             }
 
@@ -3197,9 +3211,9 @@ public class SubsamplingScaleImageView extends View {
         void onTileLoadError(Exception e);
 
         /**
-        * Called when a bitmap set using ImageSource.cachedBitmap is no longer being used by the View.
-        * This is useful if you wish to manage the bitmap after the preview is shown
-        */
+         * Called when a bitmap set using ImageSource.cachedBitmap is no longer being used by the View.
+         * This is useful if you wish to manage the bitmap after the preview is shown
+         */
         void onPreviewReleased();
     }
 
@@ -3252,5 +3266,4 @@ public class SubsamplingScaleImageView extends View {
         @Override public void onScaleChanged(float newScale, int origin) { }
 
     }
-
 }
